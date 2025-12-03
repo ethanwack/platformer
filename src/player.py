@@ -1,7 +1,8 @@
 """
-Player class - handles player movement, jumping, and collisions
+Player class - handles player movement, jumping, and collisions with sprite animations
 """
 import pygame
+import os
 from src.constants import DIFFICULTY_SETTINGS, SCREEN_WIDTH, SCREEN_HEIGHT, COLOR_PLAYER
 
 class Player(pygame.sprite.Sprite):
@@ -17,13 +18,21 @@ class Player(pygame.sprite.Sprite):
         self.jump_power = settings["JUMP_POWER"]
         
         # Animation states
-        self.state = "idle"  # idle, running, jumping, falling
+        self.state = "idle"  # idle, running, jumping, falling, double_jumping, wall_jumping
         self.animation_frame = 0
         self.animation_speed = 0.15
         self.facing_right = True
         
+        # Load all sprite sheets with proper dimension handling
+        self.idle_sprites = self._load_sprite_sheet("idle.png", (32, 32))          # 11 frames
+        self.run_sprites = self._load_sprite_sheet("run.png", (32, 32))            # 12 frames
+        self.jump_sprite = self._load_image("jump.png")                            # 1 frame (32x32)
+        self.fall_sprite = self._load_image("fall.png")                            # 1 frame (32x32)
+        self.double_jump_sprites = self._load_sprite_sheet("double_jump.png", (32, 32))  # 6 frames
+        self.wall_jump_sprites = self._load_sprite_sheet("wall_jump.png", (32, 32))     # 5 frames
+        
         # Create player sprite
-        self.image = self._create_character_sprite()
+        self.image = (self.idle_sprites[0] if self.idle_sprites else None) or pygame.Surface((32, 32))
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
@@ -33,51 +42,68 @@ class Player(pygame.sprite.Sprite):
         self.velocity_x = 0
         self.is_jumping = False
         self.on_ground = False
+        self.wall_jumping = False
+        self.double_jump_available = True
     
-    def _create_character_sprite(self, state="idle", frame=0):
-        """Create an animated character sprite"""
-        # Create a character with animation frames
-        image = pygame.Surface((32, 48), pygame.SRCALPHA)
+    def _load_image(self, filename):
+        """Load a single image from the project root"""
+        try:
+            path = os.path.join(os.path.dirname(os.path.dirname(__file__)), filename)
+            image = pygame.image.load(path).convert_alpha()
+            return image
+        except Exception as e:
+            print(f"Could not load {filename}: {e}")
+            return None
+    
+    def _load_sprite_sheet(self, filename, frame_size):
+        """Load a sprite sheet and split it into individual frames"""
+        try:
+            path = os.path.join(os.path.dirname(os.path.dirname(__file__)), filename)
+            sheet = pygame.image.load(path).convert_alpha()
+            
+            frames = []
+            frame_width, frame_height = frame_size
+            num_frames = sheet.get_width() // frame_width
+            
+            for i in range(num_frames):
+                frame = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+                frame.blit(sheet, (0, 0), (i * frame_width, 0, frame_width, frame_height))
+                frames.append(frame)
+            
+            return frames if frames else None
+        except Exception as e:
+            print(f"Could not load {filename}: {e}")
+            return None
+    
+    def _get_current_sprite(self):
+        """Get the current sprite based on animation state"""
+        sprite = None
         
-        # Head (circle)
-        pygame.draw.circle(image, (255, 200, 100), (16, 12), 8)
+        if self.state == "idle" and self.idle_sprites:
+            frame_idx = int(self.animation_frame) % len(self.idle_sprites)
+            sprite = self.idle_sprites[frame_idx]
+        elif self.state == "running" and self.run_sprites:
+            frame_idx = int(self.animation_frame) % len(self.run_sprites)
+            sprite = self.run_sprites[frame_idx]
+        elif self.state == "jumping":
+            sprite = self.jump_sprite
+        elif self.state == "falling":
+            sprite = self.fall_sprite
+        elif self.state == "double_jumping" and self.double_jump_sprites:
+            frame_idx = int(self.animation_frame) % len(self.double_jump_sprites)
+            sprite = self.double_jump_sprites[frame_idx]
+        elif self.state == "wall_jumping" and self.wall_jump_sprites:
+            frame_idx = int(self.animation_frame) % len(self.wall_jump_sprites)
+            sprite = self.wall_jump_sprites[frame_idx]
         
-        # Body (rectangle)
-        pygame.draw.rect(image, COLOR_PLAYER, (12, 20, 20, 16))
-        
-        # Eyes
-        pygame.draw.circle(image, (0, 0, 0), (13, 10), 2)
-        pygame.draw.circle(image, (0, 0, 0), (19, 10), 2)
-        
-        # Smile
-        pygame.draw.arc(image, (0, 0, 0), (13, 10, 6, 4), 0, 3.14, 1)
-        
-        # Animation based on state
-        if state == "jumping":
-            # Jumping pose - legs spread
-            pygame.draw.line(image, (255, 200, 100), (12, 24), (2, 32), 2)
-            pygame.draw.line(image, (255, 200, 100), (20, 24), (30, 32), 2)
-            pygame.draw.line(image, COLOR_PLAYER, (14, 36), (10, 45), 2)
-            pygame.draw.line(image, COLOR_PLAYER, (18, 36), (22, 45), 2)
-        elif state == "running":
-            # Running pose - alternating legs
-            offset = 2 if frame % 2 == 0 else -2
-            pygame.draw.line(image, (255, 200, 100), (12, 24), (4 + offset, 28), 2)
-            pygame.draw.line(image, (255, 200, 100), (20, 24), (28 - offset, 28), 2)
-            pygame.draw.line(image, COLOR_PLAYER, (14, 36), (12 + offset * 1.5, 45), 2)
-            pygame.draw.line(image, COLOR_PLAYER, (18, 36), (20 - offset * 1.5, 45), 2)
-        else:  # idle
-            # Standing pose
-            pygame.draw.line(image, (255, 200, 100), (12, 24), (6, 28), 2)
-            pygame.draw.line(image, (255, 200, 100), (20, 24), (26, 28), 2)
-            pygame.draw.line(image, COLOR_PLAYER, (14, 36), (12, 45), 2)
-            pygame.draw.line(image, COLOR_PLAYER, (18, 36), (20, 45), 2)
+        if not sprite:
+            sprite = pygame.Surface((32, 32), pygame.SRCALPHA)
         
         # Flip if facing left
         if not self.facing_right:
-            image = pygame.transform.flip(image, True, False)
+            sprite = pygame.transform.flip(sprite, True, False)
         
-        return image
+        return sprite
     
     def move_left(self):
         """Move player left"""
@@ -110,9 +136,9 @@ class Player(pygame.sprite.Sprite):
         self.rect.x += self.velocity_x
         self.rect.y += self.velocity_y
         
-        # Update animation
+        # Update animation frame
         self.animation_frame += self.animation_speed
-        if self.animation_frame >= 2:
+        if self.animation_frame >= 12:  # Max frames in run sprite sheet
             self.animation_frame = 0
         
         # Update state for animation
@@ -126,7 +152,7 @@ class Player(pygame.sprite.Sprite):
             self.state = "idle"
         
         # Update sprite based on state
-        self.image = self._create_character_sprite(self.state, int(self.animation_frame))
+        self.image = self._get_current_sprite()
         
         # Reset velocity for next frame
         self.velocity_x = 0
@@ -134,7 +160,7 @@ class Player(pygame.sprite.Sprite):
         # Screen boundaries
         if self.rect.left < 0:
             self.rect.left = 0
-        if self.rect.right > SCREEN_WIDTH + 2000:  # Allow going far right with world
+        if self.rect.right > SCREEN_WIDTH + 2000:
             self.rect.right = SCREEN_WIDTH + 2000
         
         # Reset jumping flag if falling

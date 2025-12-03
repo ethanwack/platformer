@@ -1,147 +1,148 @@
 """
-Player class - handles player movement, jumping, and collisions with sprite animations
+Player class - clean implementation with sprite loading, physics and simple attack.
 """
 import pygame
 import os
 from src.constants import DIFFICULTY_SETTINGS, SCREEN_WIDTH, SCREEN_HEIGHT, COLOR_PLAYER
+
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y, difficulty="MEDIUM"):
         super().__init__()
         self.start_x = x
         self.start_y = y
-        
-        # Get difficulty settings
+
+        # Difficulty settings
         settings = DIFFICULTY_SETTINGS.get(difficulty, DIFFICULTY_SETTINGS["MEDIUM"])
         self.gravity = settings["GRAVITY"]
         self.player_speed = settings["PLAYER_SPEED"]
         self.jump_power = settings["JUMP_POWER"]
-        
-        # Animation states
-        self.state = "idle"  # idle, running, jumping, falling, double_jumping, wall_jumping
-        self.animation_frame = 0
+
+        # Animation / sprite data
+        self.state = "idle"
+        self.animation_frame = 0.0
         self.animation_speed = 0.15
         self.facing_right = True
-        
-        # Load all sprite sheets with proper dimension handling
-        self.idle_sprites = self._load_sprite_sheet("idle.png", (32, 32))          # 11 frames
-        self.run_sprites = self._load_sprite_sheet("run.png", (32, 32))            # 12 frames
-        self.jump_sprite = self._load_image("jump.png")                            # 1 frame (32x32)
-        self.fall_sprite = self._load_image("fall.png")                            # 1 frame (32x32)
-        self.double_jump_sprites = self._load_sprite_sheet("double_jump.png", (32, 32))  # 6 frames
-        self.wall_jump_sprites = self._load_sprite_sheet("wall_jump.png", (32, 32))     # 5 frames
-        
-        # Create player sprite
-        self.image = (self.idle_sprites[0] if self.idle_sprites else None) or pygame.Surface((32, 32))
+
+        # Load sprites
+        self.idle_sheet = self._load_image("Start (Idle).png")
+        self.moving_frames = self._load_moving_sprites("Start (Moving) (64x64).png")
+        self.small_idle = self._load_sprite_sheet("idle.png", (32, 32))
+        self.small_run = self._load_sprite_sheet("run.png", (32, 32))
+        self.small_jump = self._load_image("jump.png")
+        self.small_fall = self._load_image("fall.png")
+
+        # initial image
+        if self.idle_sheet:
+            self.image = self.idle_sheet
+        elif self.small_idle:
+            self.image = self.small_idle[0]
+        else:
+            self.image = self._create_fallback_sprite()
+
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
-        
+
         # Physics
-        self.velocity_y = 0
         self.velocity_x = 0
-        self.is_jumping = False
+        self.velocity_y = 0
         self.on_ground = False
-        self.wall_jumping = False
-        self.double_jump_available = True
-    
+        self.is_jumping = False
+
+        # Weapon/attack
+        self.weapon = None
+        self.ammo = 0
+        self.attacking = False
+        self.attack_timer = 0
+        self.attack_duration = 12
+
+    def _create_fallback_sprite(self):
+        surf = pygame.Surface((32, 48), pygame.SRCALPHA)
+        pygame.draw.circle(surf, (255, 200, 100), (16, 12), 8)
+        pygame.draw.rect(surf, COLOR_PLAYER, (12, 20, 20, 16))
+        return surf
+
     def _load_image(self, filename):
-        """Load a single image from the project root"""
         try:
             path = os.path.join(os.path.dirname(os.path.dirname(__file__)), filename)
-            image = pygame.image.load(path).convert_alpha()
-            return image
-        except Exception as e:
-            print(f"Could not load {filename}: {e}")
+            return pygame.image.load(path).convert_alpha()
+        except Exception:
             return None
-    
-    def _load_sprite_sheet(self, filename, frame_size):
-        """Load a sprite sheet and split it into individual frames"""
+
+    def _load_moving_sprites(self, filename):
         try:
             path = os.path.join(os.path.dirname(os.path.dirname(__file__)), filename)
             sheet = pygame.image.load(path).convert_alpha()
-            
+            fw = 64
+            fh = sheet.get_height()
             frames = []
-            frame_width, frame_height = frame_size
-            num_frames = sheet.get_width() // frame_width
-            
-            for i in range(num_frames):
-                frame = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
-                frame.blit(sheet, (0, 0), (i * frame_width, 0, frame_width, frame_height))
-                frames.append(frame)
-            
-            return frames if frames else None
-        except Exception as e:
-            print(f"Could not load {filename}: {e}")
+            for i in range(sheet.get_width() // fw):
+                f = pygame.Surface((fw, fh), pygame.SRCALPHA)
+                f.blit(sheet, (0, 0), (i * fw, 0, fw, fh))
+                frames.append(f)
+            return frames
+        except Exception:
             return None
-    
-    def _get_current_sprite(self):
-        """Get the current sprite based on animation state"""
-        sprite = None
-        
-        if self.state == "idle" and self.idle_sprites:
-            frame_idx = int(self.animation_frame) % len(self.idle_sprites)
-            sprite = self.idle_sprites[frame_idx]
-        elif self.state == "running" and self.run_sprites:
-            frame_idx = int(self.animation_frame) % len(self.run_sprites)
-            sprite = self.run_sprites[frame_idx]
-        elif self.state == "jumping":
-            sprite = self.jump_sprite
-        elif self.state == "falling":
-            sprite = self.fall_sprite
-        elif self.state == "double_jumping" and self.double_jump_sprites:
-            frame_idx = int(self.animation_frame) % len(self.double_jump_sprites)
-            sprite = self.double_jump_sprites[frame_idx]
-        elif self.state == "wall_jumping" and self.wall_jump_sprites:
-            frame_idx = int(self.animation_frame) % len(self.wall_jump_sprites)
-            sprite = self.wall_jump_sprites[frame_idx]
-        
-        if not sprite:
-            sprite = pygame.Surface((32, 32), pygame.SRCALPHA)
-        
-        # Flip if facing left
-        if not self.facing_right:
-            sprite = pygame.transform.flip(sprite, True, False)
-        
-        return sprite
-    
+
+    def _load_sprite_sheet(self, filename, frame_size):
+        try:
+            path = os.path.join(os.path.dirname(os.path.dirname(__file__)), filename)
+            sheet = pygame.image.load(path).convert_alpha()
+            fw, fh = frame_size
+            frames = []
+            for i in range(sheet.get_width() // fw):
+                f = pygame.Surface((fw, fh), pygame.SRCALPHA)
+                f.blit(sheet, (0, 0), (i * fw, 0, fw, fh))
+                frames.append(f)
+            return frames
+        except Exception:
+            return None
+
     def move_left(self):
-        """Move player left"""
         self.velocity_x = -self.player_speed
         self.facing_right = False
-    
+
     def move_right(self):
-        """Move player right"""
         self.velocity_x = self.player_speed
         self.facing_right = True
-    
+
     def jump(self):
-        """Make player jump if on ground"""
         if self.on_ground:
             self.velocity_y = -self.jump_power
-            self.is_jumping = True
             self.on_ground = False
-            self.state = "jumping"
-    
+            self.is_jumping = True
+
+    def attack(self):
+        if self.weapon and self.ammo > 0 and not self.attacking:
+            self.attacking = True
+            self.attack_timer = 0
+            self.ammo -= 1
+
+    def get_attack_rect(self):
+        if not self.attacking:
+            return None
+        w = 32
+        h = 20
+        if self.facing_right:
+            ax = self.rect.right
+        else:
+            ax = self.rect.left - w
+        ay = self.rect.centery - h // 2
+        return pygame.Rect(ax, ay, w, h)
+
     def update(self):
-        """Update player position and physics"""
-        # Apply gravity
+        # physics
         self.velocity_y += self.gravity
-        
-        # Cap falling velocity
         if self.velocity_y > 15:
             self.velocity_y = 15
-        
-        # Update position
         self.rect.x += self.velocity_x
         self.rect.y += self.velocity_y
-        
-        # Update animation frame
+
+        # animation frame tick
         self.animation_frame += self.animation_speed
-        if self.animation_frame >= 12:  # Max frames in run sprite sheet
-            self.animation_frame = 0
-        
-        # Update state for animation
+
+        # state
         if self.velocity_y < -2:
             self.state = "jumping"
         elif self.velocity_y > 1 and not self.on_ground:
@@ -150,63 +151,83 @@ class Player(pygame.sprite.Sprite):
             self.state = "running"
         else:
             self.state = "idle"
-        
-        # Update sprite based on state
-        self.image = self._get_current_sprite()
-        
-        # Reset velocity for next frame
+
+        # choose image
+        img = None
+        if self.idle_sheet and self.state == "idle":
+            img = self.idle_sheet
+        elif self.moving_frames and self.state == "running":
+            idx = int(self.animation_frame) % len(self.moving_frames)
+            img = self.moving_frames[idx]
+        elif self.small_idle and self.state == "idle":
+            img = self.small_idle[int(self.animation_frame) % len(self.small_idle)]
+        elif self.small_run and self.state == "running":
+            img = self.small_run[int(self.animation_frame) % len(self.small_run)]
+        elif self.state == "jumping" and self.small_jump:
+            img = self.small_jump
+        elif self.state == "falling" and self.small_fall:
+            img = self.small_fall
+
+        if img:
+            if not self.facing_right:
+                img = pygame.transform.flip(img, True, False)
+            self.image = img
+
+        # reset horizontal velocity
         self.velocity_x = 0
-        
-        # Screen boundaries
+
+        # clamp
         if self.rect.left < 0:
             self.rect.left = 0
         if self.rect.right > SCREEN_WIDTH + 2000:
             self.rect.right = SCREEN_WIDTH + 2000
-        
-        # Reset jumping flag if falling
+
+        # reset flags
         if self.velocity_y > 0:
             self.is_jumping = False
-        
-        # Reset ground flag each frame
         self.on_ground = False
-    
+
+        # attack timing
+        if self.attacking:
+            self.attack_timer += 1
+            if self.attack_timer >= self.attack_duration:
+                self.attacking = False
+                self.attack_timer = 0
+
     def check_collision(self, platform):
-        """Check collision with a platform"""
         if self.rect.colliderect(platform.rect):
-            # Coming from above (standing on platform)
+            # from above
             if self.velocity_y >= 0 and self.rect.bottom <= platform.rect.top + 15:
                 self.rect.bottom = platform.rect.top
                 self.velocity_y = 0
                 self.on_ground = True
                 self.is_jumping = False
-                self.state = "idle"
                 return True
-            # Coming from below (hitting head)
-            elif self.velocity_y < 0 and self.rect.top >= platform.rect.bottom - 10:
+            # head hit
+            if self.velocity_y < 0 and self.rect.top >= platform.rect.bottom - 10:
                 self.rect.top = platform.rect.bottom
                 self.velocity_y = 0
                 return True
-            # Coming from left side
-            elif self.velocity_x > 0 and self.rect.right <= platform.rect.left + 10:
+            # side collisions
+            if self.velocity_x > 0 and self.rect.right <= platform.rect.left + 10:
                 self.rect.right = platform.rect.left
                 return True
-            # Coming from right side
-            elif self.velocity_x < 0 and self.rect.left >= platform.rect.right - 10:
+            if self.velocity_x < 0 and self.rect.left >= platform.rect.right - 10:
                 self.rect.left = platform.rect.right
                 return True
         return False
-    
+
     def reset(self):
-        """Reset player to start position"""
         self.rect.x = self.start_x
         self.rect.y = self.start_y
         self.velocity_x = 0
         self.velocity_y = 0
-        self.is_jumping = False
         self.on_ground = False
+        self.is_jumping = False
         self.state = "idle"
         self.animation_frame = 0
-    
+        self.attacking = False
+
     def draw(self, surface):
-        """Draw player on screen"""
         surface.blit(self.image, self.rect)
+

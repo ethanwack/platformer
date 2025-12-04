@@ -59,6 +59,12 @@ class Player(pygame.sprite.Sprite):
         self.attack_timer = 0
         self.attack_duration = 12
 
+        # Health
+        self.max_health = 3
+        self.health = self.max_health
+        self.invincibility_timer = 0
+        self.invincibility_duration = 120  # Frames of invincibility after hit (2 seconds at 60 FPS)
+
     def _create_fallback_sprite(self):
         surf = pygame.Surface((32, 48), pygame.SRCALPHA)
         pygame.draw.circle(surf, (255, 200, 100), (16, 12), 8)
@@ -133,6 +139,18 @@ class Player(pygame.sprite.Sprite):
             ax = self.rect.left - w
         ay = self.rect.centery - h // 2
         return pygame.Rect(ax, ay, w, h)
+
+    def take_damage(self, amount=1):
+        """Reduce health and apply invincibility frames. Returns True if player dies."""
+        if self.invincibility_timer <= 0:
+            self.health -= amount
+            self.invincibility_timer = self.invincibility_duration
+            return self.health <= 0
+        return False
+
+    def is_invincible(self):
+        """Check if player is currently invincible."""
+        return self.invincibility_timer > 0
 
     def update(self):
         # physics
@@ -216,6 +234,10 @@ class Player(pygame.sprite.Sprite):
             if self.attack_timer >= self.attack_duration:
                 self.attacking = False
                 self.attack_timer = 0
+
+        # invincibility timer
+        if self.invincibility_timer > 0:
+            self.invincibility_timer -= 1
 
     def check_collision(self, platform):
         if self.rect.colliderect(platform.rect):

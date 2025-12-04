@@ -17,21 +17,21 @@ DIFFICULTY_SETTINGS = {
     "EASY": {
         "GRAVITY": 0.4,
         "PLAYER_SPEED": 6,
-        "JUMP_POWER": 16,
+        "JUMP_POWER": 11,
         "ENEMY_SPEED": 1.5,
         "ENEMY_DAMAGE": False  # Enemies can't hurt you
     },
     "MEDIUM": {
         "GRAVITY": 0.5,
         "PLAYER_SPEED": 5,
-        "JUMP_POWER": 15,
+        "JUMP_POWER": 10,
         "ENEMY_SPEED": 2,
         "ENEMY_DAMAGE": True
     },
     "HARD": {
         "GRAVITY": 0.6,
         "PLAYER_SPEED": 4,
-        "JUMP_POWER": 14,
+        "JUMP_POWER": 9,
         "ENEMY_SPEED": 3,
         "ENEMY_DAMAGE": True
     }
@@ -40,7 +40,7 @@ DIFFICULTY_SETTINGS = {
 # Default settings
 GRAVITY = 0.5
 PLAYER_SPEED = 5
-JUMP_POWER = 15
+JUMP_POWER = 10
 ENEMY_SPEED = 2
 
 # Colors

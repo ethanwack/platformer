@@ -23,6 +23,7 @@ class Game:
         self.level = None
         self.player = None
         self.camera_x = 0  # Camera position for side-scrolling
+        self.game_over_timer = 0  # Frames spent in GAME_OVER state
         
     def start_game(self, difficulty):
         """Initialize game with selected difficulty"""
@@ -101,6 +102,15 @@ class Game:
                             self.start_game(diff)
                             break
             
+            elif self.game_state == "GAME_OVER":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        # Return to difficulty select
+                        self.game_state = "DIFFICULTY_SELECT"
+                    elif event.key == pygame.K_r:
+                        # Restart same level
+                        self.start_game(self.difficulty)
+            
             elif self.game_state == "PLAYING":
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_UP:
@@ -173,14 +183,44 @@ class Game:
         
         # Check collision with enemies
         for enemy in self.level.enemies:
+            # Enemy detection and attack logic
+            if enemy.detect_player(self.player):
+                # Move towards player
+                if self.player.rect.centerx > enemy.rect.centerx:
+                    enemy.direction = 1
+                else:
+                    enemy.direction = -1
+                
+                # Attack if close enough
+                if abs(self.player.rect.centerx - enemy.rect.centerx) < enemy.attack_range:
+                    enemy.attack()
+            
+            # Check attack collision (melee attacks)
+            attack_rect = enemy.get_attack_rect()
+            if attack_rect and self.player.rect.colliderect(attack_rect):
+                if not self.player.is_invincible():
+                    if self.player.take_damage(1):
+                        # Player died
+                        self.game_state = "GAME_OVER"
+                        self.game_over_timer = 0
+            
+            # Check projectile collisions (ranged enemies)
+            for projectile in enemy.projectiles[:]:
+                projectile.update()
+                if self.player.rect.colliderect(projectile.rect):
+                    if not self.player.is_invincible():
+                        if self.player.take_damage(1):
+                            # Player died
+                            self.game_state = "GAME_OVER"
+                            self.game_over_timer = 0
+                        enemy.projectiles.remove(projectile)
+            
+            # Check player stomp collision (jumping on enemy)
             if self.player.rect.colliderect(enemy.rect):
                 if self.player.velocity_y > 0 and self.player.rect.bottom < enemy.rect.centery:
                     # Player jumped on enemy
                     enemy.kill()
                     self.player.velocity_y = -15
-                else:
-                    # Player hit by enemy
-                    self.player.reset()
         
         # Check collision with boss
         if self.level.boss and not self.level.boss.is_defeated():
@@ -194,7 +234,11 @@ class Game:
                         pass
                 else:
                     # Player hit by boss
-                    self.player.reset()
+                    if not self.player.is_invincible():
+                        if self.player.take_damage(1):
+                            # Player died
+                            self.game_state = "GAME_OVER"
+                            self.game_over_timer = 0
         
         # Check collision with goal (only if boss is defeated or no boss)
         if self.level.goal and self.player.rect.colliderect(self.level.goal):
@@ -233,6 +277,9 @@ class Game:
             self.screen.blit(difficulty_text, (10, 40))
             self.screen.blit(ammo_text, (10, 70))
             
+            # Draw health bar
+            self._draw_health_bar(10, 100)
+            
             # Draw controls at bottom left
             controls_text = self.font_small.render("← → Move  | ↑ Jump  | SPACE Attack  | R Reset", True, (50, 50, 50))
             self.screen.blit(controls_text, (10, SCREEN_HEIGHT - 30))
@@ -248,20 +295,44 @@ class Game:
             
             pygame.display.flip()
         
-        elif self.game_state == "GAME_COMPLETE":
-            self.screen.fill(COLOR_BACKGROUND)
+        elif self.game_state == "GAME_OVER":
+            self.screen.fill((50, 50, 50))
             
-            title = self.font_medium.render("YOU WIN!", True, (0, 0, 0))
-            restart_text = self.font_small.render("Click to play again", True, (0, 0, 0))
+            title = self.font_medium.render("GAME OVER", True, (255, 0, 0))
+            restart_text = self.font_small.render("Press R to Restart or SPACE to return to Menu", True, (255, 255, 255))
             
             self.screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 200))
             self.screen.blit(restart_text, (SCREEN_WIDTH // 2 - restart_text.get_width() // 2, 300))
             
             pygame.display.flip()
-            
-            for event in pygame.event.get():
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    self.game_state = "DIFFICULTY_SELECT"
+    
+    def _draw_health_bar(self, x, y):
+        """Draw player health bar"""
+        bar_width = 100
+        bar_height = 20
+        
+        # Background (dark)
+        pygame.draw.rect(self.screen, (100, 0, 0), (x, y, bar_width, bar_height))
+        
+        # Health (red to green gradient effect)
+        health_ratio = self.player.health / self.player.max_health
+        current_width = int(bar_width * health_ratio)
+        
+        if health_ratio > 0.5:
+            color = (0, 200, 0)  # Green
+        elif health_ratio > 0.25:
+            color = (255, 200, 0)  # Yellow
+        else:
+            color = (255, 0, 0)  # Red
+        
+        pygame.draw.rect(self.screen, color, (x, y, current_width, bar_height))
+        
+        # Border
+        pygame.draw.rect(self.screen, (200, 200, 200), (x, y, bar_width, bar_height), 2)
+        
+        # Text
+        health_text = self.font_small.render(f"HP: {self.player.health}/{self.player.max_health}", True, (0, 0, 0))
+        self.screen.blit(health_text, (x + bar_width + 10, y))
     
     def run(self):
         """Main game loop"""

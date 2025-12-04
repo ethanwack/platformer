@@ -33,6 +33,7 @@ class Level:
         self.pickups.clear()
         self.effects.clear()
         self.boss = None
+        self.enemy_counter = 0  # Track enemy count for sprite variation
         
         if level_num == 1:
             self.load_level_1()
@@ -81,12 +82,18 @@ class Level:
         self.platforms.append(Platform(2300, 250, 80, 20))
         self.platforms.append(Platform(2400, 150, 80, 20))
         
-        # Enemies scattered throughout
+        # Enemies scattered throughout - mix of types for variety
         if self.difficulty != "EASY":
-            self.enemies.append(Enemy(400, 350, patrol_left=300, patrol_right=600, difficulty=self.difficulty))
-            self.enemies.append(Enemy(1000, 300, patrol_left=900, patrol_right=1200, difficulty=self.difficulty))
+            self.enemies.append(Enemy(400, 350, patrol_left=300, patrol_right=600, difficulty=self.difficulty, 
+                                     enemy_type=self.enemy_counter, ability_type=Enemy.MELEE))
+            self.enemy_counter += 1
+            self.enemies.append(Enemy(1000, 300, patrol_left=900, patrol_right=1200, difficulty=self.difficulty, 
+                                     enemy_type=self.enemy_counter, ability_type=Enemy.RANGED))
+            self.enemy_counter += 1
         if self.difficulty == "HARD":
-            self.enemies.append(Enemy(1700, 300, patrol_left=1600, patrol_right=1900, difficulty=self.difficulty))
+            self.enemies.append(Enemy(1700, 300, patrol_left=1600, patrol_right=1900, difficulty=self.difficulty, 
+                                     enemy_type=self.enemy_counter, ability_type=Enemy.CHARGER))
+            self.enemy_counter += 1
         
         # Boss at the end (after maze completion)
         self.boss = Boss(2600, 300, level=1, difficulty=self.difficulty)
@@ -142,7 +149,7 @@ class Level:
         # Boss area approach
         self.platforms.append(Platform(2350, 150, 80, 20))
         
-        # Enemies throughout maze
+        # Enemies throughout maze - varied types for difficulty
         enemy_count = 2 if self.difficulty == "EASY" else (4 if self.difficulty == "MEDIUM" else 5)
         positions = [
             (350, 350, 250, 450),
@@ -151,9 +158,12 @@ class Level:
             (2100, 300, 2000, 2250),
             (2300, 200, 2200, 2400)
         ]
+        ability_types = [Enemy.MELEE, Enemy.RANGED, Enemy.CHARGER, Enemy.MELEE, Enemy.RANGED]
         for i in range(min(enemy_count, len(positions))):
             x, y, left, right = positions[i]
-            self.enemies.append(Enemy(x, y, patrol_left=left, patrol_right=right, difficulty=self.difficulty))
+            self.enemies.append(Enemy(x, y, patrol_left=left, patrol_right=right, difficulty=self.difficulty, 
+                                     enemy_type=self.enemy_counter, ability_type=ability_types[i]))
+            self.enemy_counter += 1
         
         # Boss at end of maze
         self.boss = Boss(2600, 200, level=2, difficulty=self.difficulty)
@@ -205,7 +215,7 @@ class Level:
         self.platforms.append(Platform(2300, 380, 100, 20))
         self.platforms.append(Platform(2450, 360, 100, 20))
         
-        # More enemies in complex maze
+        # More enemies in complex maze - varied types
         enemy_count = 3 if self.difficulty == "EASY" else (5 if self.difficulty == "MEDIUM" else 6)
         positions = [
             (500, 350, 400, 600),
@@ -215,9 +225,12 @@ class Level:
             (2200, 350, 2100, 2400),
             (2350, 350, 2250, 2500)
         ]
+        ability_types = [Enemy.RANGED, Enemy.CHARGER, Enemy.MELEE, Enemy.RANGED, Enemy.CHARGER, Enemy.MELEE]
         for i in range(min(enemy_count, len(positions))):
             x, y, left, right = positions[i]
-            self.enemies.append(Enemy(x, y, patrol_left=left, patrol_right=right, difficulty=self.difficulty))
+            self.enemies.append(Enemy(x, y, patrol_left=left, patrol_right=right, difficulty=self.difficulty, 
+                                     enemy_type=self.enemy_counter, ability_type=ability_types[i]))
+            self.enemy_counter += 1
         
         # Boss at end
         self.boss = Boss(2700, 280, level=3, difficulty=self.difficulty)
@@ -275,7 +288,7 @@ class Level:
         self.platforms.append(Platform(2350, 250, 100, 20))
         self.platforms.append(Platform(2500, 200, 100, 20))
         
-        # Many enemies
+        # Many enemies - balanced mix
         enemy_count = 4 if self.difficulty == "EASY" else (6 if self.difficulty == "MEDIUM" else 7)
         positions = [
             (300, 350, 200, 400),
@@ -286,9 +299,12 @@ class Level:
             (2050, 300, 1950, 2150),
             (2300, 280, 2200, 2500)
         ]
+        ability_types = [Enemy.MELEE, Enemy.RANGED, Enemy.CHARGER, Enemy.MELEE, Enemy.RANGED, Enemy.CHARGER, Enemy.MELEE]
         for i in range(min(enemy_count, len(positions))):
             x, y, left, right = positions[i]
-            self.enemies.append(Enemy(x, y, patrol_left=left, patrol_right=right, difficulty=self.difficulty))
+            self.enemies.append(Enemy(x, y, patrol_left=left, patrol_right=right, difficulty=self.difficulty, 
+                                     enemy_type=self.enemy_counter, ability_type=ability_types[i]))
+            self.enemy_counter += 1
         
         # Boss
         self.boss = Boss(2700, 200, level=4, difficulty=self.difficulty)
@@ -346,7 +362,7 @@ class Level:
         self.platforms.append(Platform(2450, 200, 80, 20))
         self.platforms.append(Platform(2600, 120, 80, 20))
         
-        # Maximum enemies
+        # Maximum enemies - all types used
         enemy_count = 5 if self.difficulty == "EASY" else (7 if self.difficulty == "MEDIUM" else 8)
         positions = [
             (200, 380, 100, 350),
@@ -358,9 +374,12 @@ class Level:
             (2250, 300, 2150, 2400),
             (2500, 200, 2400, 2650)
         ]
+        ability_types = [Enemy.CHARGER, Enemy.MELEE, Enemy.RANGED, Enemy.CHARGER, Enemy.MELEE, Enemy.RANGED, Enemy.CHARGER, Enemy.MELEE]
         for i in range(min(enemy_count, len(positions))):
             x, y, left, right = positions[i]
-            self.enemies.append(Enemy(x, y, patrol_left=left, patrol_right=right, difficulty=self.difficulty))
+            self.enemies.append(Enemy(x, y, patrol_left=left, patrol_right=right, difficulty=self.difficulty, 
+                                     enemy_type=self.enemy_counter, ability_type=ability_types[i]))
+            self.enemy_counter += 1
         
         # FINAL BOSS - at far end of level
         self.boss = Boss(2800, 150, level=5, difficulty=self.difficulty)
@@ -425,6 +444,10 @@ class Level:
                 enemy_copy = enemy.rect.copy()
                 enemy_copy.x = draw_x
                 surface.blit(enemy.image, enemy_copy)
+            
+            # Draw enemy projectiles
+            for projectile in getattr(enemy, 'projectiles', []):
+                projectile.draw(surface, camera_offset=camera_offset)
 
         # Draw pickups
         for p in getattr(self, 'pickups', []):

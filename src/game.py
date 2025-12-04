@@ -228,12 +228,14 @@ class Game:
             # Draw UI (no camera offset)
             level_text = self.font_small.render(f"Level: {self.level.current_level}/5", True, (0, 0, 0))
             difficulty_text = self.font_small.render(f"Difficulty: {self.difficulty}", True, (0, 0, 0))
-            camera_text = self.font_small.render(f"Pos: {self.player.rect.x//50}", True, (0, 0, 0))
             ammo_text = self.font_small.render(f"Ammo: {self.player.ammo}", True, (100, 100, 100) if not self.player.weapon else (200, 100, 0))
             self.screen.blit(level_text, (10, 10))
             self.screen.blit(difficulty_text, (10, 40))
-            self.screen.blit(camera_text, (10, 70))
-            self.screen.blit(ammo_text, (10, 100))
+            self.screen.blit(ammo_text, (10, 70))
+            
+            # Draw controls at bottom left
+            controls_text = self.font_small.render("← → Move  | ↑ Jump  | SPACE Attack  | R Reset", True, (50, 50, 50))
+            self.screen.blit(controls_text, (10, SCREEN_HEIGHT - 30))
             
             # Draw boss status if boss exists
             if self.level.boss:

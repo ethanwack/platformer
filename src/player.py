@@ -49,6 +49,8 @@ class Player(pygame.sprite.Sprite):
         self.velocity_y = 0
         self.on_ground = False
         self.is_jumping = False
+        self.jump_buffer = 0  # Frames remaining in jump buffer
+        self.jump_buffer_max = 6  # Allow jump input up to 6 frames after landing
 
         # Weapon/attack
         self.weapon = None
@@ -108,10 +110,11 @@ class Player(pygame.sprite.Sprite):
         self.facing_right = True
 
     def jump(self):
-        if self.on_ground:
+        if self.on_ground or self.jump_buffer > 0:
             self.velocity_y = -self.jump_power
             self.on_ground = False
             self.is_jumping = True
+            self.jump_buffer = 0  # Consume the buffer
 
     def attack(self):
         if self.weapon and self.ammo > 0 and not self.attacking:
@@ -178,6 +181,12 @@ class Player(pygame.sprite.Sprite):
             if not self.facing_right:
                 img = pygame.transform.flip(img, True, False)
             self.image = img
+            # Update rect to match current image size, but preserve position
+            old_bottom = self.rect.bottom
+            old_left = self.rect.left
+            self.rect = self.image.get_rect()
+            self.rect.bottom = old_bottom
+            self.rect.left = old_left
         else:
             # Fallback if no sprite is available - create a simple square
             if not hasattr(self, '_fallback_created'):
@@ -197,6 +206,9 @@ class Player(pygame.sprite.Sprite):
         if self.velocity_y > 0:
             self.is_jumping = False
         self.on_ground = False
+        
+        # Manage jump buffer - decrement each frame, reset when landing
+        self.jump_buffer = max(0, self.jump_buffer - 1)
 
         # attack timing
         if self.attacking:
@@ -207,35 +219,40 @@ class Player(pygame.sprite.Sprite):
 
     def check_collision(self, platform):
         if self.rect.colliderect(platform.rect):
-            # Calculate overlap distances
-            overlap_top = self.rect.bottom - platform.rect.top      # How much player overlaps from above
-            overlap_bottom = platform.rect.bottom - self.rect.top   # How much player overlaps from below
-            overlap_left = self.rect.right - platform.rect.left     # How much player overlaps from left
-            overlap_right = platform.rect.right - self.rect.left    # How much player overlaps from right
+            # Determine which side of the platform the player is coming from
+            # by checking where the player was before this frame
             
-            # Find minimum overlap to determine collision direction
-            min_overlap = min(overlap_top, overlap_bottom, overlap_left, overlap_right)
+            # How much are we overlapping?
+            overlap_top = self.rect.bottom - platform.rect.top      # Distance from player bottom to platform top
+            overlap_bottom = platform.rect.bottom - self.rect.top   # Distance from platform bottom to player top
+            overlap_left = self.rect.right - platform.rect.left     # Distance from player right to platform left
+            overlap_right = platform.rect.right - self.rect.left    # Distance from platform right to player left
             
-            # from above (landing on platform) - PRIORITY
-            if min_overlap == overlap_top and self.velocity_y >= 0:
+            # Player is falling onto platform from above
+            if overlap_top > 0 and overlap_top < overlap_bottom and self.velocity_y >= 0:
                 self.rect.bottom = platform.rect.top
                 self.velocity_y = 0
                 self.on_ground = True
                 self.is_jumping = False
+                self.jump_buffer = self.jump_buffer_max  # Refresh jump buffer on landing
                 return True
-            # head hit (jumping into platform from below)
-            elif min_overlap == overlap_bottom and self.velocity_y < 0:
+            
+            # Player is jumping into platform from below
+            elif overlap_bottom > 0 and overlap_bottom < overlap_top and self.velocity_y < 0:
                 self.rect.top = platform.rect.bottom
                 self.velocity_y = 0
                 return True
-            # side collision from right
-            elif min_overlap == overlap_left and self.velocity_x > 0:
-                self.rect.right = platform.rect.left
-                return True
-            # side collision from left
-            elif min_overlap == overlap_right and self.velocity_x < 0:
+            
+            # Player is hitting platform from the right side (moving left into it)
+            elif overlap_left > 0 and overlap_left < overlap_right and self.velocity_x < 0:
                 self.rect.left = platform.rect.right
                 return True
+            
+            # Player is hitting platform from the left side (moving right into it)
+            elif overlap_right > 0 and overlap_right < overlap_left and self.velocity_x > 0:
+                self.rect.right = platform.rect.left
+                return True
+        
         return False
 
     def reset(self):
@@ -248,6 +265,7 @@ class Player(pygame.sprite.Sprite):
         self.state = "idle"
         self.animation_frame = 0
         self.attacking = False
+        self.jump_buffer = 0
 
     def draw(self, surface):
         surface.blit(self.image, self.rect)

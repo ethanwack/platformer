@@ -107,6 +107,8 @@ class Game:
                         self.player.jump()
                     if event.key == pygame.K_r:
                         self.player.reset()
+                    if event.key == pygame.K_e:
+                        self.player.attack()
         
         # Continuous key checking for movement
         if self.game_state == "PLAYING":
@@ -143,6 +145,31 @@ class Game:
         # Check collision with platforms
         for platform in self.level.platforms:
             self.player.check_collision(platform)
+        
+        # Check collision with weapon pickups
+        for pickup in self.level.pickups[:]:
+            if self.player.rect.colliderect(pickup.rect):
+                self.player.weapon = "spiked_ball"
+                self.player.ammo += pickup.ammo
+                self.level.pickups.remove(pickup)
+        
+        # Check collision with checkpoints
+        for checkpoint in self.level.checkpoints:
+            if self.player.rect.colliderect(checkpoint.rect):
+                checkpoint.activate()
+        
+        # Check player attack collisions (weapon attack hit detection)
+        attack_rect = self.player.get_attack_rect()
+        if attack_rect:
+            # Check if attack hits enemies
+            for enemy in self.level.enemies[:]:
+                if attack_rect.colliderect(enemy.rect):
+                    enemy.kill()
+                    self.level.enemies.remove(enemy)
+            # Check if attack hits boss
+            if self.level.boss and not self.level.boss.is_defeated():
+                if attack_rect.colliderect(self.level.boss.rect):
+                    self.level.boss.take_damage(1)
         
         # Check collision with enemies
         for enemy in self.level.enemies:
@@ -194,16 +221,19 @@ class Game:
             player_draw_x = self.player.rect.x - self.camera_x
             player_draw_rect = self.player.rect.copy()
             player_draw_rect.x = player_draw_x
-            if 0 <= player_draw_x <= SCREEN_WIDTH + 50:
+            # Draw if player is on or near screen (allowing partial visibility)
+            if -50 <= player_draw_x <= SCREEN_WIDTH + 50:
                 self.screen.blit(self.player.image, player_draw_rect)
             
             # Draw UI (no camera offset)
             level_text = self.font_small.render(f"Level: {self.level.current_level}/5", True, (0, 0, 0))
             difficulty_text = self.font_small.render(f"Difficulty: {self.difficulty}", True, (0, 0, 0))
             camera_text = self.font_small.render(f"Pos: {self.player.rect.x//50}", True, (0, 0, 0))
+            ammo_text = self.font_small.render(f"Ammo: {self.player.ammo}", True, (100, 100, 100) if not self.player.weapon else (200, 100, 0))
             self.screen.blit(level_text, (10, 10))
             self.screen.blit(difficulty_text, (10, 40))
             self.screen.blit(camera_text, (10, 70))
+            self.screen.blit(ammo_text, (10, 100))
             
             # Draw boss status if boss exists
             if self.level.boss:

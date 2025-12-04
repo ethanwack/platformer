@@ -13,6 +13,9 @@ class Level:
         self.enemies = []
         self.boss = None
         self.goal = None
+        self.checkpoints = []
+        self.pickups = []
+        self.effects = []
         self.current_level = 1
         self.difficulty = difficulty
         self.camera_offset = 0
@@ -26,6 +29,9 @@ class Level:
         """Load a specific level"""
         self.platforms.clear()
         self.enemies.clear()
+        self.checkpoints.clear()
+        self.pickups.clear()
+        self.effects.clear()
         self.boss = None
         
         if level_num == 1:
@@ -87,6 +93,12 @@ class Level:
         
         # Goal after defeating boss
         self.goal = pygame.Rect(2700, 250, 40, 40)
+        # Place a checkpoint near the mid maze
+        from src.checkpoint import Checkpoint
+        self.checkpoints.append(Checkpoint(600, SCREEN_HEIGHT - 104))
+        # Place a weapon pickup
+        from src.weapon import WeaponPickup
+        self.pickups.append(WeaponPickup(520, 320, filename="Spiked Ball.png", ammo=3))
     
     def load_level_2(self):
         """Level 2 - Tighter jumps with intricate pathways"""
@@ -148,6 +160,10 @@ class Level:
         
         # Goal
         self.goal = pygame.Rect(2700, 150, 40, 40)
+        from src.checkpoint import Checkpoint
+        from src.weapon import WeaponPickup
+        self.checkpoints.append(Checkpoint(900, SCREEN_HEIGHT - 104))
+        self.pickups.append(WeaponPickup(1200, 260, filename="Spiked Ball.png", ammo=2))
     
     def load_level_3(self):
         """Level 3 - Complex maze with precision jumps"""
@@ -208,6 +224,10 @@ class Level:
         
         # Goal
         self.goal = pygame.Rect(2800, 230, 40, 40)
+        from src.checkpoint import Checkpoint
+        from src.weapon import WeaponPickup
+        self.checkpoints.append(Checkpoint(1100, SCREEN_HEIGHT - 104))
+        self.pickups.append(WeaponPickup(1600, 240, filename="Spiked Ball.png", ammo=2))
     
     def load_level_4(self):
         """Level 4 - Advanced maze with multiple routes"""
@@ -275,6 +295,10 @@ class Level:
         
         # Goal
         self.goal = pygame.Rect(2800, 150, 40, 40)
+        from src.checkpoint import Checkpoint
+        from src.weapon import WeaponPickup
+        self.checkpoints.append(Checkpoint(1400, SCREEN_HEIGHT - 104))
+        self.pickups.append(WeaponPickup(1800, 320, filename="Spiked Ball.png", ammo=3))
     
     def load_level_5(self):
         """Level 5 - Expert maze leading to final boss"""
@@ -343,6 +367,11 @@ class Level:
         
         # Goal - only accessible after boss defeat
         self.goal = pygame.Rect(2900, 100, 40, 40)
+        from src.checkpoint import Checkpoint
+        from src.weapon import WeaponPickup
+        self.checkpoints.append(Checkpoint(2000, SCREEN_HEIGHT - 104))
+        # Final level includes a few collectibles (reuse WeaponPickup for now as chest)
+        self.pickups.append(WeaponPickup(2300, 260, filename="Spiked Ball.png", ammo=5))
     
     def load_next_level(self):
         """Load the next level"""
@@ -356,6 +385,17 @@ class Level:
         """Update all level elements"""
         for enemy in self.enemies:
             enemy.update()
+        for cp in getattr(self, 'checkpoints', []):
+            cp.update()
+        # pickups are static but could be animated in future
+        # update transient effects
+        for e in list(getattr(self, 'effects', [])):
+            e.update()
+            if not e.active:
+                try:
+                    self.effects.remove(e)
+                except ValueError:
+                    pass
     
     def draw(self, surface, camera_offset=0):
         """Draw all level elements with camera offset"""
@@ -385,6 +425,15 @@ class Level:
                 enemy_copy = enemy.rect.copy()
                 enemy_copy.x = draw_x
                 surface.blit(enemy.image, enemy_copy)
+
+        # Draw pickups
+        for p in getattr(self, 'pickups', []):
+            p.draw(surface, camera_offset=camera_offset)
+
+        # Draw checkpoints
+        for cp in getattr(self, 'checkpoints', []):
+            cp.update()
+            cp.draw(surface, camera_offset=camera_offset)
         
         # Draw boss with camera offset
         if self.boss and not self.boss.is_defeated():

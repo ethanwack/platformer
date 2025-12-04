@@ -152,26 +152,37 @@ class Player(pygame.sprite.Sprite):
         else:
             self.state = "idle"
 
-        # choose image
+        # choose image - prioritize small sprites for consistency, fall back to single images
         img = None
-        if self.idle_sheet and self.state == "idle":
-            img = self.idle_sheet
-        elif self.moving_frames and self.state == "running":
-            idx = int(self.animation_frame) % len(self.moving_frames)
-            img = self.moving_frames[idx]
-        elif self.small_idle and self.state == "idle":
-            img = self.small_idle[int(self.animation_frame) % len(self.small_idle)]
-        elif self.small_run and self.state == "running":
-            img = self.small_run[int(self.animation_frame) % len(self.small_run)]
-        elif self.state == "jumping" and self.small_jump:
-            img = self.small_jump
-        elif self.state == "falling" and self.small_fall:
-            img = self.small_fall
+        if self.state == "idle":
+            # Use small_idle sprite sheet if available
+            if self.small_idle:
+                frame_idx = int(self.animation_frame) % len(self.small_idle)
+                img = self.small_idle[frame_idx]
+            elif self.idle_sheet:
+                img = self.idle_sheet
+        elif self.state == "running":
+            # Use small_run sprite sheet if available
+            if self.small_run:
+                frame_idx = int(self.animation_frame) % len(self.small_run)
+                img = self.small_run[frame_idx]
+            elif self.moving_frames:
+                frame_idx = int(self.animation_frame) % len(self.moving_frames)
+                img = self.moving_frames[frame_idx]
+        elif self.state == "jumping":
+            img = self.small_jump if self.small_jump else None
+        elif self.state == "falling":
+            img = self.small_fall if self.small_fall else None
 
         if img:
             if not self.facing_right:
                 img = pygame.transform.flip(img, True, False)
             self.image = img
+        else:
+            # Fallback if no sprite is available - create a simple square
+            if not hasattr(self, '_fallback_created'):
+                self.image = self._create_fallback_sprite()
+                self._fallback_created = True
 
         # reset horizontal velocity
         self.velocity_x = 0

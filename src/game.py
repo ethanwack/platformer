@@ -103,12 +103,12 @@ class Game:
             
             elif self.game_state == "PLAYING":
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
+                    if event.key == pygame.K_UP:
                         self.player.jump()
+                    if event.key == pygame.K_SPACE:
+                        self.player.attack()
                     if event.key == pygame.K_r:
                         self.player.reset()
-                    if event.key == pygame.K_e:
-                        self.player.attack()
         
         # Continuous key checking for movement
         if self.game_state == "PLAYING":

@@ -207,23 +207,33 @@ class Player(pygame.sprite.Sprite):
 
     def check_collision(self, platform):
         if self.rect.colliderect(platform.rect):
-            # from above
-            if self.velocity_y >= 0 and self.rect.bottom <= platform.rect.top + 15:
+            # Calculate overlap distances
+            overlap_top = self.rect.bottom - platform.rect.top      # How much player overlaps from above
+            overlap_bottom = platform.rect.bottom - self.rect.top   # How much player overlaps from below
+            overlap_left = self.rect.right - platform.rect.left     # How much player overlaps from left
+            overlap_right = platform.rect.right - self.rect.left    # How much player overlaps from right
+            
+            # Find minimum overlap to determine collision direction
+            min_overlap = min(overlap_top, overlap_bottom, overlap_left, overlap_right)
+            
+            # from above (landing on platform) - PRIORITY
+            if min_overlap == overlap_top and self.velocity_y >= 0:
                 self.rect.bottom = platform.rect.top
                 self.velocity_y = 0
                 self.on_ground = True
                 self.is_jumping = False
                 return True
-            # head hit
-            if self.velocity_y < 0 and self.rect.top >= platform.rect.bottom - 10:
+            # head hit (jumping into platform from below)
+            elif min_overlap == overlap_bottom and self.velocity_y < 0:
                 self.rect.top = platform.rect.bottom
                 self.velocity_y = 0
                 return True
-            # side collisions
-            if self.velocity_x > 0 and self.rect.right <= platform.rect.left + 10:
+            # side collision from right
+            elif min_overlap == overlap_left and self.velocity_x > 0:
                 self.rect.right = platform.rect.left
                 return True
-            if self.velocity_x < 0 and self.rect.left >= platform.rect.right - 10:
+            # side collision from left
+            elif min_overlap == overlap_right and self.velocity_x < 0:
                 self.rect.left = platform.rect.right
                 return True
         return False
